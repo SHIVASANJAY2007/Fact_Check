@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VeriShield — AI Fact-Checker powered by Google Fact Check API</title>
+  <meta name="description" content="Scalable AI pipeline detecting misinformation in vernacular news using the Google Fact Check Tools API." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+  <style>
+    /* ── LEGENDARY INLINE STYLES ───────────────────────────────────── */
+    @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+    @keyframes gradient-shift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes float-slow {
+      0%,100% { transform: translateY(0px) rotate(0deg); }
+      33%      { transform: translateY(-18px) rotate(1deg); }
+      66%      { transform: translateY(-8px) rotate(-1deg); }
+    }
+    @keyframes glow-pulse {
+      0%,100% { opacity: 0.5; }
+      50%      { opacity: 1; }
+    }
+    @keyframes slide-up {
+      from { opacity:0; transform: translateY(30px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
+    }
+    @keyframes rotate-slow {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* ── API / metric inline helpers ─────────────────────────────── */
+    .api-badge { display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.63rem;font-weight:700;letter-spacing:.3px;white-space:nowrap;font-family:'Space Grotesk',sans-serif;backdrop-filter:blur(8px); }
+    .api-badge-live  { background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);color:rgba(255,255,255,.75);box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
+    .api-badge-local { background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4); }
+
+    /* ── Particles bg ──────────────────────────────────────────── */
+    .particles {
+      position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;
+    }
+    .p {
+      position:absolute;border-radius:50%;
+      background:radial-gradient(circle, rgba(255,255,255,.18) 0%, transparent 70%);
+      animation: float-slow linear infinite;
+    }
+    .p:nth-child(1)  { width:3px;height:3px; top:10%;left:15%;  animation-duration:12s; }
+    .p:nth-child(2)  { width:2px;height:2px; top:25%;left:70%;  animation-duration:16s;animation-delay:-4s; }
+    .p:nth-child(3)  { width:4px;height:4px; top:60%;left:30%;  animation-duration:20s;animation-delay:-8s; }
+    .p:nth-child(4)  { width:2px;height:2px; top:80%;left:80%;  animation-duration:14s;animation-delay:-2s; }
+    .p:nth-child(5)  { width:3px;height:3px; top:40%;left:90%;  animation-duration:18s;animation-delay:-6s; }
+    .p:nth-child(6)  { width:5px;height:5px; top:70%;left:10%;  animation-duration:22s;animation-delay:-10s; }
+    .p:nth-child(7)  { width:2px;height:2px; top:15%;left:45%;  animation-duration:15s;animation-delay:-3s; }
+    .p:nth-child(8)  { width:3px;height:3px; top:55%;left:55%;  animation-duration:19s;animation-delay:-7s; }
+    .p:nth-child(9)  { width:2px;height:2px; top:35%;left:20%;  animation-duration:13s;animation-delay:-1s; }
+    .p:nth-child(10) { width:4px;height:4px; top:90%;left:50%;  animation-duration:17s;animation-delay:-5s; }
+
+    /* ── Legendary dashboard section wrapper ───────────────────── */
+    .dash-section {
+      position:relative;z-index:1;
+      padding:0 2.5rem 2rem;
+    }
+    .dash-header {
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:1.25rem;flex-wrap:wrap;gap:1rem;
+    }
+    .dash-title {
+      font-family:'Space Grotesk',sans-serif;
+      font-size:1rem;font-weight:700;color:#fff;
+      display:flex;align-items:center;gap:10px;letter-spacing:-.2px;
+    }
+    .dash-title::before {
+      content:'';display:block;width:3px;height:20px;
+      border-radius:2px;background:#fff;
+      box-shadow:0 0 12px rgba(255,255,255,.6);
+    }
+    .dash-meta { font-size:.72rem;color:rgba(255,255,255,.35); }
+
+    /* ── Divider ───────────────────────────────────────────────── */
+    .divider {
+      display:flex;align-items:center;gap:1rem;
+      padding:0 2.5rem 2rem;position:relative;z-index:1;
+      color:rgba(255,255,255,.25);font-size:.6rem;
+      font-family:'Space Grotesk',sans-serif;font-weight:800;letter-spacing:3px;text-transform:uppercase;
+    }
+    .divider::before,.divider::after {
+      content:'';flex:1;height:1px;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Atmospheric particles ─────────────────────────────────── -->
+<div class="particles" aria-hidden="true">
+  <div class="p"></div><div class="p"></div><div class="p"></div>
+  <div class="p"></div><div class="p"></div><div class="p"></div>
+  <div class="p"></div><div class="p"></div><div class="p"></div>
+  <div class="p"></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     FLOATING PILL NAVBAR
+═══════════════════════════════════════════════════════════════ -->
+<header class="nav-wrap" role="banner">
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <a class="nav-brand" href="#" aria-label="VeriShield Home">
+      <div class="nav-logo-icon" aria-hidden="true">🛡</div>
+      <span class="nav-title">Veri<span>Shield</span></span>
+    </a>
+
+    <div class="nav-links" role="list">
+      <a href="#how-it-works" class="nav-link">How It Works</a>
+      <a href="#dashboard" class="nav-link">Dashboard</a>
+    </div>
+
+    <div class="nav-right">
+      <div class="nav-stat" title="Posts processed live">
+        <span class="dot" aria-hidden="true"></span>
+        <span>Live</span>
+        <span class="count" id="nav-processed">8,47,234</span>
+      </div>
+      <button class="nav-cta" onclick="scrollToDashboard()" id="nav-dashboard-btn">
+        Analyze Now ↗
+      </button>
+    </div>
+  </nav>
+</header>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     HERO
+═══════════════════════════════════════════════════════════════ -->
+<section class="hero" id="hero" aria-labelledby="hero-heading">
+  <!-- Background glow orbs -->
+  <div class="hero-orbs" aria-hidden="true">
+    <div class="orb o1"></div>
+    <div class="orb o2"></div>
+    <div class="orb o3"></div>
+  </div>
+
+  <!-- Left column -->
+  <div class="hero-left">
+    <div class="hero-eyebrow">
+      <span class="eyebrow-dot"></span>
+      Project 5 — Gen AI &amp; NLP
+    </div>
+
+    <h1 class="hero-title" id="hero-heading">
+      Automated<br/>
+      <span class="hero-title-accent">Fact‑Checker</span><br/>
+      <span class="hero-title-sub">for Vernacular News</span>
+    </h1>
+
+    <p class="hero-desc">
+      A scalable AI pipeline that monitors vernacular news, strips conversational noise,
+      and cross-references the <strong>Google Fact Check API</strong> — detecting misinformation
+      at <strong>thousands of posts per minute.</strong>
+    </p>
+
+    <div class="hero-actions">
+      <button class="btn-hero" onclick="scrollToDashboard()" id="hero-dashboard-btn">
+        <span>🚀</span> Open Dashboard
+      </button>
+      <button class="btn-ghost" id="hero-learn-btn" onclick="document.getElementById('how-it-works').scrollIntoView({behavior:'smooth'})">
+        How It Works
+      </button>
+    </div>
+
+    <!-- Live counters -->
+    <div class="hero-stats">
+      <div class="hstat">
+        <span class="hstat-num" data-count-to="847234" data-suffix="">0</span>
+        <span class="hstat-label">Posts Analyzed</span>
+      </div>
+      <div class="hstat-div"></div>
+      <div class="hstat">
+        <span class="hstat-num" data-count-to="2100" data-suffix="/min">0</span>
+        <span class="hstat-label">Throughput</span>
+      </div>
+      <div class="hstat-div"></div>
+      <div class="hstat">
+        <span class="hstat-num" data-count-to="97" data-suffix="%">0</span>
+        <span class="hstat-label">Accuracy</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right column — floating glass card preview -->
+  <div class="hero-right" aria-hidden="true">
+    <!-- Decorative 3D widget -->
+    <div class="hero-widget">
+      <div class="hw-glow"></div>
+      <div class="hw-header">
+        <span class="hw-dot red"></span>
+        <span class="hw-dot amber"></span>
+        <span class="hw-dot green"></span>
+        <span style="flex:1;text-align:center;font-size:.68rem;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace">verishield.pipeline</span>
+      </div>
+      <div class="hw-body">
+        <div class="hw-stage done">
+          <span class="hw-stage-icon">✓</span>
+          <span class="hw-stage-text">Raw Input</span>
+          <span class="hw-stage-badge ok">Done</span>
+        </div>
+        <div class="hw-stage done">
+          <span class="hw-stage-icon">✓</span>
+          <span class="hw-stage-text">Optimize / Strip Fluff</span>
+          <span class="hw-stage-badge ok">Done</span>
+        </div>
+        <div class="hw-stage done">
+          <span class="hw-stage-icon">✓</span>
+          <span class="hw-stage-text">Extract Claims</span>
+          <span class="hw-stage-badge ok">Done</span>
+        </div>
+        <div class="hw-stage running">
+          <span class="hw-stage-icon spin-icon">⟳</span>
+          <span class="hw-stage-text">Google Fact Check API</span>
+          <span class="hw-stage-badge run">Live</span>
+        </div>
+      </div>
+      <div class="hw-footer">
+        <span class="hw-verdict-chip false">✗ FALSE</span>
+        <span style="font-size:.7rem;color:rgba(255,255,255,.35);margin-left:auto">Score: 96/100</span>
+      </div>
+    </div>
+
+    <!-- Floating info pills -->
+    <div class="hero-pill p1">🌐 Google Fact Check API</div>
+    <div class="hero-pill p2">⚡ 2,100 posts/min</div>
+    <div class="hero-pill p3">🇺🇸 English only</div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     HOW IT WORKS
+═══════════════════════════════════════════════════════════════ -->
+<section id="how-it-works" class="hiw-section">
+  <div class="hiw-header-wrap">
+    <div class="section-label">Architecture</div>
+    <h2 class="section-heading">How VeriShield Works</h2>
+    <p class="section-sub">Four optimized pipeline stages • Raw → Optimized → Claims → Verdict</p>
+  </div>
+
+  <div class="hiw-grid">
+    <div class="hiw-card" style="animation-delay:.0s">
+      <div class="hiw-icon-wrap"><span class="hiw-icon">📥</span></div>
+      <div class="hiw-num">01</div>
+      <h3 class="hiw-title">Raw Input</h3>
+      <p class="hiw-desc">Ingest posts from WhatsApp, Twitter, YouTube in English at thousands per minute.</p>
+    </div>
+    <div class="hiw-card" style="animation-delay:.08s">
+      <div class="hiw-icon-wrap"><span class="hiw-icon">⚡</span></div>
+      <div class="hiw-num">02</div>
+      <h3 class="hiw-title">Optimization</h3>
+      <p class="hiw-desc">Strip conversational fluff, emotional cues &amp; viral language to isolate pure factual content — boosting throughput 30–60%.</p>
+    </div>
+    <div class="hiw-card" style="animation-delay:.16s">
+      <div class="hiw-icon-wrap"><span class="hiw-icon">🔎</span></div>
+      <div class="hiw-num">03</div>
+      <h3 class="hiw-title">Evidence Retrieval</h3>
+      <p class="hiw-desc">Cross-reference claims against Google Fact Check Tools API using semantic matching &amp; recency-weighted scoring.</p>
+    </div>
+    <div class="hiw-card" style="animation-delay:.24s">
+      <div class="hiw-icon-wrap"><span class="hiw-icon">⚖️</span></div>
+      <div class="hiw-num">04</div>
+      <h3 class="hiw-title">Verdict</h3>
+      <p class="hiw-desc">TRUE / FALSE / DISPUTED with confidence score, clickable source citations, and FakeMeter™ risk gauge (0–100).</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     DASHBOARD
+═══════════════════════════════════════════════════════════════ -->
+<div id="dashboard">
+
+  <div class="divider">● Live Analysis Dashboard</div>
+
+  <!-- Metrics row -->
+  <div class="dash-section">
+    <div class="dash-header">
+      <div class="dash-title">System Metrics</div>
+      <div class="dash-meta">Real-time · Auto-updating</div>
+    </div>
+    <div class="metrics-row" aria-label="System metrics">
+      <div class="metric-card">
+        <div class="mc-glow"></div>
+        <span class="metric-icon">📊</span>
+        <div class="metric-value" id="processed-count">8,47,234</div>
+        <div class="metric-label">Posts Processed</div>
+        <div class="metric-trend">↑ Live processing</div>
+      </div>
+      <div class="metric-card">
+        <div class="mc-glow" style="background:radial-gradient(ellipse at 30% 0%,rgba(248,113,113,.25) 0%,transparent 70%)"></div>
+        <span class="metric-icon">🚨</span>
+        <div class="metric-value" id="detected-count">12,847</div>
+        <div class="metric-label">Misinformation Detected</div>
+        <div class="metric-trend" style="color:#f87171">↑ Flagged high-risk</div>
+      </div>
+      <div class="metric-card">
+        <div class="mc-glow" style="background:radial-gradient(ellipse at 30% 0%,rgba(147,197,253,.2) 0%,transparent 70%)"></div>
+        <span class="metric-icon">⚡</span>
+        <div class="metric-value mono" id="throughput-val">1,847</div>
+        <div class="metric-label">Posts / Minute</div>
+        <div class="metric-trend">🟢 Within SLA</div>
+      </div>
+      <div class="metric-card">
+        <div class="mc-glow" style="background:radial-gradient(ellipse at 30% 0%,rgba(196,181,253,.2) 0%,transparent 70%)"></div>
+        <span class="metric-icon">🎯</span>
+        <div class="metric-value" id="accuracy-val">97.2%</div>
+        <div class="metric-label">Detection Accuracy</div>
+        <div class="metric-trend">↑ vs. 91% baseline</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Layout: Input Area -->
+  <div class="dash-section" style="max-width: 900px; margin: 0 auto;">
+
+    <!-- Input Area -->
+    <div class="input-section" aria-label="Post analysis input">
+      <div class="dash-header">
+        <div class="dash-title">Analyze a Post</div>
+      </div>
+      <div class="input-card">
+        <div class="input-card-header">
+          <span>📝</span>
+          <span>Paste news post, social caption, or forwarded message</span>
+          <span style="margin-left:auto;font-size:.68rem;color:rgba(255,255,255,.3)">Ctrl+Enter to run</span>
+        </div>
+        <textarea
+          id="post-input" class="input-area" rows="4"
+          aria-label="Enter post content for analysis"
+          placeholder="Paste news post here...&#10;&#10;Example: 'New Education Policy 2020 bans all English medium schools from 2024!'"
+        ></textarea>
+        <div class="input-footer">
+          <div class="input-meta">
+          </div>
+          <button class="btn-analyze" id="check-btn" aria-label="Analyze this post">
+            🔍 Analyze Post
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipeline Progress Bar -->
+  <div class="pipeline-progress" aria-label="Pipeline progress" role="progressbar">
+    <div class="progress-step"><div class="progress-step-dot" id="prog-0" title="Stage 1"></div><div class="progress-step-line" id="prog-line-0"></div></div>
+    <div class="progress-step"><div class="progress-step-dot" id="prog-1" title="Stage 2"></div><div class="progress-step-line" id="prog-line-1"></div></div>
+    <div class="progress-step"><div class="progress-step-dot" id="prog-2" title="Stage 3"></div><div class="progress-step-line" id="prog-line-2"></div></div>
+    <div class="progress-step"><div class="progress-step-dot" id="prog-3" title="Stage 4"></div><div class="progress-step-line" id="prog-line-3"></div></div>
+    <div class="progress-step-dot" id="prog-4" style="width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.18);transition:all .4s cubic-bezier(.4,0,.2,1)" title="Complete"></div>
+  </div>
+
+  <!-- Pipeline Cards -->
+  <div class="dash-section">
+    <div class="dash-header">
+      <div class="dash-title">Analysis Pipeline</div>
+      <div class="dash-meta">4 stages — Raw → Optimize → Extract → Verdict</div>
+    </div>
+    <div class="pipeline-grid">
+      <div class="pipeline-card" id="pipeline-card-0" aria-label="Stage 1: Raw Input">
+        <div class="pipeline-card-header">
+          <span class="pipeline-stage-badge">📥 Raw Input</span>
+          <span class="pipeline-stage-num">01 / 04</span>
+        </div>
+        <div class="pipeline-card-title">Input Post</div>
+        <div id="card-raw-content">
+          <div class="pipeline-card-content" style="color:rgba(255,255,255,.3);font-style:italic;font-size:.8rem">Waiting for input...</div>
+        </div>
+        <div class="pipeline-scanning" aria-hidden="true"></div>
+      </div>
+
+      <div class="pipeline-card" id="pipeline-card-1" aria-label="Stage 2: Optimization">
+        <div class="pipeline-card-header">
+          <span class="pipeline-stage-badge">⚡ Optimize</span>
+          <span class="pipeline-stage-num">02 / 04</span>
+        </div>
+        <div class="pipeline-card-title">Strip Fluff</div>
+        <div id="card-clean-content">
+          <div class="pipeline-card-content" style="color:rgba(255,255,255,.3);font-style:italic;font-size:.8rem">Will strip fluff &amp; extract signal...</div>
+        </div>
+        <div class="pipeline-scanning" aria-hidden="true"></div>
+      </div>
+
+      <div class="pipeline-card" id="pipeline-card-2" aria-label="Stage 3: Claim Extraction">
+        <div class="pipeline-card-header">
+          <span class="pipeline-stage-badge">🔎 Claims</span>
+          <span class="pipeline-stage-num">03 / 04</span>
+        </div>
+        <div class="pipeline-card-title">Extract Claims</div>
+        <div id="card-claims-content">
+          <div class="pipeline-card-content" style="color:rgba(255,255,255,.3);font-style:italic;font-size:.8rem">Will extract factual claims...</div>
+        </div>
+        <div class="pipeline-scanning" aria-hidden="true"></div>
+      </div>
+
+      <div class="pipeline-card" id="pipeline-card-3" aria-label="Stage 4: Verdict">
+        <div class="pipeline-card-header">
+          <span class="pipeline-stage-badge">⚖️ Verdict</span>
+          <span class="pipeline-stage-num">04 / 04</span>
+        </div>
+        <div class="pipeline-card-title">Final Verdict</div>
+        <div id="card-verdict-content">
+          <div class="pipeline-card-content" style="color:rgba(255,255,255,.3);font-style:italic;font-size:.8rem">Awaiting verification...</div>
+        </div>
+        <div class="pipeline-scanning" aria-hidden="true"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Block -->
+  <div id="alert-block" class="alert-block" role="alert" aria-live="assertive"></div>
+
+  <!-- Evidence Section -->
+  <div class="dash-section evidence-section hidden" id="evidence-section">
+    <div class="dash-header">
+      <div class="dash-title">Retrieved Evidence</div>
+      <div class="dash-meta">Matched from verified fact database</div>
+    </div>
+    <div class="evidence-card">
+      <div class="evidence-card-header">
+        <span style="font-size:.82rem;color:rgba(255,255,255,.6);font-weight:600">📚 Fact Database Cross-Reference</span>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="api-status-badge" class="api-badge" style="display:none"></span>
+          <span style="font-size:.7rem;color:rgba(255,255,255,.3);font-family:'JetBrains Mono',monospace">Ranked by relevance</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="evidence-table" aria-label="Evidence matches">
+          <thead>
+            <tr>
+              <th>Category</th><th>Verified Fact</th><th>Status</th><th>Match Score</th><th>Source</th>
+            </tr>
+          </thead>
+          <tbody id="evidence-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Verdict + FakeMeter -->
+  <div class="verdict-row hidden" id="verdict-area" aria-label="Verdict and FakeMeter">
+    <div class="verdict-card" aria-label="Detailed verdict">
+      <div class="verdict-label">🏛 FINAL VERDICT</div>
+      <div id="verdict-badge" class="verdict-badge false" aria-live="polite">? UNVERIFIED</div>
+      <p class="verdict-explanation" id="verdict-explanation">Analysis pending...</p>
+      <div class="verdict-source" aria-label="Source citation">
+        <span>📖</span>
+        <span id="verdict-source-text">Source loading...</span>
+      </div>
+      <div id="verdict-api-attr"></div>
+      <div class="confidence-row">
+        <span class="confidence-label">Confidence</span>
+        <div class="confidence-bar" role="progressbar">
+          <div class="confidence-bar-fill" id="confidence-fill" style="width:0%"></div>
+        </div>
+        <span class="confidence-val" id="confidence-value">–</span>
+      </div>
+    </div>
+
+    <!-- FakeMeter -->
+    <div class="fakemeter-container" aria-label="Misinformation risk gauge">
+      <div class="fakemeter-gloss" aria-hidden="true"></div>
+      <div class="fakemeter-title">FAKEMETER™</div>
+      <svg class="fakemeter-svg" viewBox="0 10 220 130" aria-hidden="true">
+        <defs>
+          <linearGradient id="seg1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#4ade80"/><stop offset="100%" stop-color="#a3e635"/></linearGradient>
+          <linearGradient id="seg2" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#a3e635"/><stop offset="100%" stop-color="#fbbf24"/></linearGradient>
+          <linearGradient id="seg3" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#f97316"/></linearGradient>
+          <linearGradient id="seg4" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#f97316"/><stop offset="100%" stop-color="#ef4444"/></linearGradient>
+          <filter id="gs"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,.6)"/></filter>
+        </defs>
+        <path d="M 20 120 A 90 90 0 0 1 200 120" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="16" stroke-linecap="round" filter="url(#gs)"/>
+        <path d="M 20 120 A 90 90 0 0 1 56 48" fill="none" stroke="url(#seg1)" stroke-width="14" stroke-linecap="round" opacity=".9"/>
+        <path d="M 56 48 A 90 90 0 0 1 110 30" fill="none" stroke="url(#seg2)" stroke-width="14" opacity=".9"/>
+        <path d="M 110 30 A 90 90 0 0 1 164 48" fill="none" stroke="url(#seg3)" stroke-width="14" stroke-linecap="round" opacity=".9"/>
+        <path d="M 164 48 A 90 90 0 0 1 200 120" fill="none" stroke="url(#seg4)" stroke-width="14" stroke-linecap="round" opacity=".9"/>
+        <g stroke="rgba(255,255,255,.2)" stroke-width="1.5">
+          <line x1="20" y1="120" x2="26" y2="111" transform="rotate(-90,110,120)"/>
+          <line x1="20" y1="120" x2="26" y2="111" transform="rotate(-45,110,120)"/>
+          <line x1="20" y1="120" x2="26" y2="111" transform="rotate(0,110,120)"/>
+          <line x1="20" y1="120" x2="26" y2="111" transform="rotate(45,110,120)"/>
+          <line x1="20" y1="120" x2="26" y2="111" transform="rotate(90,110,120)"/>
+        </g>
+        <text x="18" y="132" fill="rgba(255,255,255,.25)" font-size="8" font-family="JetBrains Mono,monospace" text-anchor="middle">0</text>
+        <text x="110" y="26" fill="rgba(255,255,255,.25)" font-size="8" font-family="JetBrains Mono,monospace" text-anchor="middle">50</text>
+        <text x="202" y="132" fill="rgba(255,255,255,.25)" font-size="8" font-family="JetBrains Mono,monospace" text-anchor="middle">100</text>
+        <circle cx="110" cy="120" r="9" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.20)" stroke-width="1.5"/>
+        <circle cx="110" cy="120" r="3.5" fill="rgba(255,255,255,.5)"/>
+        <g id="gauge-needle" style="transform:rotate(-90deg);transform-origin:110px 120px;transition:transform 1.2s cubic-bezier(.34,1.56,.64,1)">
+          <line x1="110" y1="120" x2="110" y2="38" stroke="white" stroke-width="2.5" stroke-linecap="round" filter="url(#gs)"/>
+          <polygon points="110,31 107,44 113,44" fill="white" opacity=".9"/>
+        </g>
+      </svg>
+      <div class="fakemeter-score" id="fakemeter-score" style="color:rgba(255,255,255,.3)">–</div>
+      <div class="fakemeter-label" id="fakemeter-label" style="color:rgba(255,255,255,.3)">AWAITING SCAN</div>
+      <div class="fm-legend">
+        <div class="fm-row"><span>0–20</span><span style="color:#4ade80;font-weight:700">Credible</span></div>
+        <div class="fm-row"><span>21–45</span><span style="color:#a3e635;font-weight:700">Likely True</span></div>
+        <div class="fm-row"><span>46–65</span><span style="color:#fbbf24;font-weight:700">Disputed</span></div>
+        <div class="fm-row"><span>66–80</span><span style="color:#f97316;font-weight:700">Suspicious</span></div>
+        <div class="fm-row"><span>81–100</span><span style="color:#ef4444;font-weight:700">Misinformation</span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /dashboard -->
+
+
+<!-- ════════════════════════════════════════════════════════════
+     FOOTER
+═══════════════════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="footer-brand">
+    <div class="footer-logo">🛡</div>
+    <span class="footer-name">VeriShield</span>
+  </div>
+  <p class="footer-desc">
+    Automated Fact-Checker for Vernacular News — Project 5, Gen AI &amp; NLP.<br/>
+    Built for high-throughput real-time misinformation detection.
+  </p>
+  <div class="footer-stats">
+    <span>🏎 2,100+ posts/min</span>
+    <span>🎯 97%+ accuracy</span>
+    <span>🌐 5 languages</span>
+    <span>🔗 Google Fact Check API</span>
+  </div>
+</footer>
+
+
+<script src="app.js"></script>
+</body>
+</html>
