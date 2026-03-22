@@ -47,3 +47,4 @@ VeriShield breaks the workflow into a highly optimized 4-stage pipeline:
 Dive in and test it! Simply paste a news snippet, a WhatsApp forward, or a controversial claim, and watch the pipeline dissect, query, and verdict the information dynamically.
 
 > *"Because truth shouldn't have to wait."*
+<!-- format update 1 -->
