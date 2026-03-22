@@ -48,3 +48,4 @@ Dive in and test it! Simply paste a news snippet, a WhatsApp forward, or a contr
 
 > *"Because truth shouldn't have to wait."*
 <!-- format update 1 -->
+<!-- format update 2 -->
